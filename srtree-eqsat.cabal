@@ -25,7 +25,7 @@ source-repository head
 
 library
   exposed-modules:
-      Data.SRTree.FixTree
+      Data.SRTree.EqSat
   other-modules:
       Paths_srtree_eqsat
   hs-source-dirs:

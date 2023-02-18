@@ -1,7 +1,7 @@
 {-# language LambdaCase #-}
 module Main (main) where
 
-import Data.SRTree.FixTree
+import Data.SRTree.EqSat
 import Options.Applicative
 import Data.Bifunctor ( first )
 import Data.Char ( toLower, toUpper )

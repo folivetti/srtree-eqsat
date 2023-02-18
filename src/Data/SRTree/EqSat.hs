@@ -9,7 +9,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
-module Data.SRTree.FixTree ( simplifyEqSat ) where
+module Data.SRTree.EqSat ( simplifyEqSat ) where
 
 import Data.AEq
 
