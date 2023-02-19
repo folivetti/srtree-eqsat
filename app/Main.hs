@@ -1,19 +1,12 @@
-{-# language LambdaCase #-}
 module Main (main) where
 
-import Data.SRTree.EqSat
+import Data.Char (toLower, toUpper)
+import Data.List (intercalate)
+import Data.SRTree.EqSat (simplifyEqSat)
 import Options.Applicative
-import Data.Bifunctor ( first )
-import Data.Char ( toLower, toUpper )
-import Text.Read ( readMaybe )
-import Data.List ( intercalate )
-import Text.ParseSR ( SRAlgs(..), Output(..) )
-import Text.ParseSR.IO ( withInput, withOutput )
-import qualified Data.ByteString.Char8 as B
-import Data.SRTree
-import qualified Data.SRTree.Print as P
-import System.IO 
-import Control.Monad
+import Text.ParseSR (Output (..), SRAlgs (..))
+import Text.ParseSR.IO (withInput, withOutput)
+import Text.Read (readMaybe)
 
 envelope :: a -> [a] -> [a]
 envelope c xs = c : xs <> [c]

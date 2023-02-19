@@ -6,57 +6,31 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
 module Data.SRTree.EqSat ( simplifyEqSat ) where
 
-import Data.AEq
-
-import Data.Eq.Deriving
-import Data.Ord.Deriving
-import Text.Show.Deriving
-
-import Data.SRTree
-
-import Control.Monad.State (State)
-import qualified Control.Monad.State as ST
-
-import Data.Maybe (isJust, isNothing)
-import qualified Data.IntMap.Strict as IM
-import qualified Data.Set    as S
-import qualified Data.Foldable as F
-
 import Control.Applicative (liftA2)
 import Control.Monad (unless)
-
-{-
-import Data.Equality.Utils
-import Data.Equality.Matching
-import Data.Equality.Saturation
-import Data.Equality.Language
-import Data.Equality.Analysis
-import qualified Data.Equality.Graph.Lens as L
-import Data.Equality.Graph.Monad as GM
-import Data.Equality.Extraction
-
-
+import Data.AEq ( AEq((~==)) )
+import Data.Eq.Deriving ( deriveEq1 )
+import Data.Equality.Analysis ( Analysis(..) )
+import Data.Equality.Graph ( ClassId, Language, ENode(unNode) )
 import Data.Equality.Graph.Lens hiding ((^.))
-import Data.Equality.Matching.Database
-import Data.Equality.Graph
--}
-
-import Data.Equality.Graph.Lens hiding ((^.))
-import qualified Data.Equality.Graph.Lens as L
-import Data.Equality.Graph
-import Data.Equality.Extraction
-import Data.Equality.Analysis
+import Data.Equality.Graph.Lens qualified as L
 import Data.Equality.Matching
-import Data.Equality.Matching.Database
+import Data.Equality.Matching.Database ( Subst )
 import Data.Equality.Saturation
-import Data.Equality.Saturation.Scheduler
-
-import Data.AEq
+import Data.Equality.Saturation.Scheduler ( BackoffScheduler(BackoffScheduler) )
+import Data.Foldable qualified as F
+import Data.IntMap.Strict qualified as IM
+import Data.Maybe (isJust, isNothing)
+import Data.Ord.Deriving ( deriveOrd1 )
+import Data.SRTree
+import Data.Set qualified as S
+import Text.Show.Deriving ( deriveShow1 )
 
 data SRTreeF a = VarF Int
                | ConstF Double
@@ -76,18 +50,18 @@ deriveOrd1 ''SRTreeF
 deriveShow1 ''SRTreeF
 
 toFixTree :: SRTree Int Double -> Fix SRTreeF
-toFixTree (Const x) = Fix (ConstF x)
-toFixTree (Var x) = Fix (VarF x)
-toFixTree (Param x) = Fix ParamF
-toFixTree (Add l r) = Fix (AddF (toFixTree l) (toFixTree r))
-toFixTree (Sub l r) = Fix (SubF (toFixTree l) (toFixTree r))
-toFixTree (Mul l r) = Fix (MulF (toFixTree l) (toFixTree r))
-toFixTree (Div l r) = Fix (DivF (toFixTree l) (toFixTree r))
-toFixTree (Power l r) = Fix (PowerF (toFixTree l) (toFixTree r))
+toFixTree (Const x)     = Fix (ConstF x)
+toFixTree (Var x)       = Fix (VarF x)
+toFixTree (Param _)     = Fix ParamF
+toFixTree (Add l r)     = Fix (AddF (toFixTree l) (toFixTree r))
+toFixTree (Sub l r)     = Fix (SubF (toFixTree l) (toFixTree r))
+toFixTree (Mul l r)     = Fix (MulF (toFixTree l) (toFixTree r))
+toFixTree (Div l r)     = Fix (DivF (toFixTree l) (toFixTree r))
+toFixTree (Power l r)   = Fix (PowerF (toFixTree l) (toFixTree r))
 toFixTree (LogBase l r) = Fix (LogBaseF (toFixTree l) (toFixTree r))
-toFixTree (Fun f n) = Fix (FunF f (toFixTree n))
-toFixTree (Pow n i) = Fix (PowerF (toFixTree n) (Fix (ConstF $ fromIntegral i))) -- integral power can't be used for pattern rules
-toFixTree Empty = undefined
+toFixTree (Fun f n)     = Fix (FunF f (toFixTree n))
+toFixTree (Pow n i)     = Fix (PowerF (toFixTree n) (Fix (ConstF $ fromIntegral i))) -- integral power can't be used for pattern rules
+toFixTree Empty         = undefined
 
 toSRTree :: Fix SRTreeF -> SRTree Int Double
 toSRTree (Fix (ConstF x)) = Const x
@@ -101,42 +75,7 @@ toSRTree (Fix (PowerF c1 c2)) = Power (toSRTree c1) (toSRTree c2)
 toSRTree (Fix (LogBaseF c1 c2)) = LogBase (toSRTree c1) (toSRTree c2)
 toSRTree (Fix (FunF f c)) = Fun f (toSRTree c)
 toSRTree (Fix (PowF f i)) = Pow (toSRTree f) i -- will never exists
-{-
-relabelParams :: SRTree Int Double -> SRTree Int Double
-relabelParams t = (toState t) `ST.evalState` 0
-  where
-    toState :: SRTree Int Double -> State Int (SRTree Int Double)
-    toState (Param x) = do n <- ST.get; ST.put (n+1); pure (Param n)
-    toState (Add l r) = do l' <- toState l; r' <- toState r; pure (Add l' r')
-    toState (Sub l r) = do l' <- toState l; r' <- toState r; pure (Sub l' r')
-    toState (Mul l r) = do l' <- toState l; r' <- toState r; pure (Mul l' r')
-    toState (Div l r) = do l' <- toState l; r' <- toState r; pure (Div l' r')
-    toState (Power l (Const x)) = do l' <- toState l; if isInteger x then pure (Pow l' (round x)) else pure (Power l' (Const x))
-    toState (Power l r) = do l' <- toState l; r' <- toState r; pure (Power l' r')
-    toState (LogBase l r) = do l' <- toState l; r' <- toState r; pure (LogBase l' r')
-    toState (Fun f n) = do n' <- toState n; pure (Fun f n')
-    toState (Pow n i) = do n' <- toState n; pure (Pow n' i)
-    toState n = pure n
 
-    isInteger x = x == fromIntegral (round x)
--}
-recountParams :: SRTree Int Double -> Int
-recountParams t = (toState t) `ST.execState` 0
-  where
-    toState :: SRTree Int Double -> State Int (SRTree Int Double)
-    toState (Param x) = do n <- ST.get; ST.put (n+1); pure (Param n)
-    toState (Add l r) = do l' <- toState l; r' <- toState r; pure (Add l' r')
-    toState (Sub l r) = do l' <- toState l; r' <- toState r; pure (Sub l' r')
-    toState (Mul l r) = do l' <- toState l; r' <- toState r; pure (Mul l' r')
-    toState (Div l r) = do l' <- toState l; r' <- toState r; pure (Div l' r')
-    toState (Power l (Const x)) = do l' <- toState l; if isInteger x then pure (Pow l' (round x)) else pure (Power l' (Const x))
-    toState (Power l r) = do l' <- toState l; r' <- toState r; pure (Power l' r')
-    toState (LogBase l r) = do l' <- toState l; r' <- toState r; pure (LogBase l' r')
-    toState (Fun f n) = do n' <- toState n; pure (Fun f n')
-    toState (Pow n i) = do n' <- toState n; pure (Pow n' i)
-    toState n = pure n
-
-    isInteger x = x == fromIntegral (round x)
 instance Num (Fix SRTreeF) where
   l + r = Fix $ AddF l r
   l - r = Fix $ SubF l r
@@ -144,7 +83,7 @@ instance Num (Fix SRTreeF) where
   abs   = Fix . FunF Abs
 
   negate t    = fromInteger (-1) * t
-  signum t    = undefined
+  signum _    = undefined
   fromInteger = Fix . ConstF . fromInteger
 
 instance OptIntPow (Fix SRTreeF) where
@@ -182,7 +121,7 @@ instance Num (Pattern SRTreeF) where
   abs   = NonVariablePattern . FunF Abs
 
   negate t    = fromInteger (-1) * t
-  signum t    = undefined
+  signum _    = undefined
   fromInteger = NonVariablePattern . ConstF . fromInteger
 
 instance OptIntPow (Pattern SRTreeF) where
@@ -242,12 +181,12 @@ evalConstant = \case
 
 instance Language SRTreeF
 
-cost, cost2 :: CostFunction SRTreeF Int
-cost2 = \case
-  ConstF x -> 5
-  VarF x -> 1
+cost :: CostFunction SRTreeF Int
+cost = \case
+  ConstF _ -> 5
+  VarF _ -> 1
   AddF c1 c2 -> c1 + c2 + 1
-  SubF c1 c2 -> c1 + c2 + 1 
+  SubF c1 c2 -> c1 + c2 + 1
   MulF c1 c2 -> c1 + c2 + 1
   DivF c1 c2 -> c1 + c2 + 1
   PowerF c1 c2 -> c1 + c2 + 1
@@ -256,26 +195,11 @@ cost2 = \case
   PowF _ _ -> undefined
   ParamF -> undefined
 
-cost = \case
-  ConstF x -> 5
-  VarF x -> 2
-  ParamF -> 10
-  AddF c1 c2 -> 2 * c1 + c2
-  SubF c1 c2 -> 2 * c1 + c2
-  MulF c1 c2 -> 3 * c1 + c2
-  DivF c1 c2 -> 3 * c1 + c2
-  PowerF c1 c2 -> c1 + c2 + 5
-  LogBaseF c1 c2 -> c1 + c2 + 5
-  FunF Log c -> c + 3
-  FunF _ c -> c * 5
-  PowF _ _ -> undefined
-
 unsafeGetSubst :: Pattern SRTreeF -> Subst -> ClassId
 unsafeGetSubst (NonVariablePattern _) _ = error "unsafeGetSubst: NonVariablePattern; expecting VariablePattern"
 unsafeGetSubst (VariablePattern v) subst = case IM.lookup v subst of
       Nothing -> error "Searching for non existent bound var in conditional"
       Just class_id -> class_id
-
 
 is_not_zero :: Pattern SRTreeF -> RewriteCondition (Maybe Double) SRTreeF
 is_not_zero v subst egr =
@@ -294,21 +218,12 @@ is_const :: Pattern SRTreeF -> RewriteCondition (Maybe Double) SRTreeF
 is_const v subst egr =
     isJust (egr L.^._class (unsafeGetSubst v subst)._data)
 
-is_one_const :: Pattern SRTreeF -> Pattern SRTreeF -> RewriteCondition (Maybe Double) SRTreeF
-is_one_const v1 v2 subst egr =
-    let
-      mb1 = (egr L.^._class (unsafeGetSubst v1 subst)._data)
-      mb2 = (egr L.^._class (unsafeGetSubst v2 subst)._data)
-    in case (mb1, mb2) of
-      (Just _, Just _) -> False
-      (Nothing, Nothing) -> False
-      _ -> True
-
 is_not_const :: Pattern SRTreeF -> RewriteCondition (Maybe Double) SRTreeF
 is_not_const v subst egr =
     isNothing (egr L.^._class (unsafeGetSubst v subst)._data)
 
-rewritesBasic = 
+rewritesBasic :: [Rewrite (Maybe Double) SRTreeF]
+rewritesBasic =
     [   -- commutativity
         "x" + "y" := "y" + "x"
       , "x" * "y" := "y" * "x"
@@ -347,10 +262,10 @@ rewritesBasic =
       , "x" - "x" := 0
       , "x" / "x" := 1 :| is_not_zero "x"
       -- distributive and factorization
-      , ("x" * "y") + ("x" * "z") := "x" * ("y" + "z") 
+      , ("x" * "y") + ("x" * "z") := "x" * ("y" + "z")
       , "x" - ("y" + "z") := ("x" - "y") - "z"
       , "x" - ("y" - "z") := ("x" - "y") + "z"
-      , negate ("x" + "y") := negate "x" - "y" 
+      , negate ("x" + "y") := negate "x" - "y"
       , ("x" - "a") := "x" + negate "a" :| is_const "a" :| is_not_const "x"
       , ("x" - ("a" * "y")) := "x" + (negate "a" * "y") :| is_const "a" :| is_not_const "y"
       , (1 / "x") * (1 / "y") := 1 / ("x" * "y")
@@ -361,10 +276,11 @@ rewritesBasic =
       , "x" + negate "y" := "x" - "y" :| is_not_const "y"
       , 0 - "x" := negate "x" :| is_not_const "x"
    ]
+
+rewritesFun :: [Rewrite (Maybe Double) SRTreeF]
 rewritesFun = [
---        log ("x" * "y") := log "x" + log "y" :| is_not_neg_consts "x" "y" :| is_not_zero "x" :| is_not_zero "y" :| is_one_const "x" "y"
         log ("x" / "y") := log "x" - log "y" :| is_not_neg_consts "x" "y" :| is_not_zero "x" :| is_not_zero "y"
-      , log ("x" ** "y") := "y" * log "x" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
+      , log ("x" ** "y") := "y" * log "x" :| is_not_neg_consts "x" "x" :| is_not_zero "x"
       , log 1 := 0
       , log (sqrt "x") := 0.5 * log "x" :| is_not_const "x"
       , log (exp "x") := "x" :| is_not_const "x"
@@ -378,13 +294,15 @@ rewritesFun = [
     ]
 
 
-rewriteTree t = fst $ equalitySaturation' (BackoffScheduler 2500 30) t (rewritesBasic <> rewritesFun) cost2
+rewriteTree :: Fix SRTreeF -> Fix SRTreeF
+rewriteTree t = fst $ equalitySaturation' (BackoffScheduler 2500 30) t (rewritesBasic <> rewritesFun) cost
 
-rewriteUntilNoChange rs 0 t = t
+rewriteUntilNoChange :: [Fix SRTreeF -> Fix SRTreeF] -> Int -> Fix SRTreeF -> Fix SRTreeF
+rewriteUntilNoChange _ 0 t = t
 rewriteUntilNoChange rs n t
   | t == t'   = t'
   | otherwise = rewriteUntilNoChange (tail rs <> [head rs]) (n-1) t'
-  where t' = (head rs) t
+  where t' = head rs t
 
 simplifyEqSat :: SRTree Int Double -> SRTree Int Double
 simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteTree] 2 . toFixTree
