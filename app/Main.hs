@@ -60,7 +60,7 @@ opt = Args
 main :: IO ()
 main = do
   args <- execParser opts
-  withInput (infile args) (from args) (varnames args) False
+  withInput (infile args) (from args) (varnames args) False False
     >>= withOutput (outfile args) MATH . fmap (simplifyEqSat <$>)
   
   where 
