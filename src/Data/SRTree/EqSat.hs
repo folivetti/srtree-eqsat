@@ -261,7 +261,7 @@ rewritesFun :: [Rewrite (Maybe Double) SRTreeF]
 rewritesFun = [
         log ("x" * "y") := log "x" + log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
        , log ("x" / "y") := log "x" - log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
-      , log ("x" ** "y") := "y" * log "x" :| is_not_neg_consts "x" "x" :| is_not_zero "x"
+      , log ("x" ** "y") := "y" * log "x" :| is_not_neg_consts "y" "y" :| is_not_zero "y"
       --, log 1 := 0
       , log (sqrt "x") := 0.5 * log "x" :| is_not_const "x"
       , log (exp "x") := "x" :| is_not_const "x"
@@ -271,7 +271,7 @@ rewritesFun = [
       , sqrt ("a" * ("x" - "y")) := sqrt (negate "a") * sqrt ("y" - "x") :| is_negative "a"
       , sqrt ("a" * ("b" + "y")) := sqrt (negate "a") * sqrt ("b" - "y") :| is_negative "a" :| is_negative "b"
       , sqrt ("a" / "x") := sqrt "a" / sqrt "x" :| is_not_neg_consts "a" "x"
-      , abs ("x" * "y") := abs "x" * abs "y"
+      , abs ("x" * "y") := abs "x" * abs "y" :| is_const "x"
     ]
 
 constFusion :: [Rewrite (Maybe Double) SRTreeF]
@@ -298,8 +298,8 @@ constFusion = [
     ]
 
 rewriteTree, rewriteTreeFusion :: Fix SRTreeF -> Fix SRTreeF
-rewriteTree t = fst $ equalitySaturation' (BackoffScheduler 2500 30) t (constFusion <> rewritesBasic <> rewritesFun) cost
-rewriteTreeFusion t = fst $ equalitySaturation' (BackoffScheduler 2500 30) t constFusion cost
+rewriteTree t = fst $ equalitySaturation' (BackoffScheduler 300 10) t (constFusion <> rewritesFun <> rewritesBasic) cost
+rewriteTreeFusion t = fst $ equalitySaturation' (BackoffScheduler 300 10) t constFusion cost
 
 rewriteUntilNoChange :: [Fix SRTreeF -> Fix SRTreeF] -> Int -> Fix SRTreeF -> Fix SRTreeF
 rewriteUntilNoChange _ 0 t = t
@@ -309,4 +309,4 @@ rewriteUntilNoChange rs n t
   where t' = head rs t
 
 simplifyEqSat :: SRTree Int Double -> SRTree Int Double
-simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteTreeFusion, rewriteTree, rewriteTree] 3 . toFixTree
+simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteTreeFusion, rewriteTree, rewriteTreeFusion, rewriteTree] 4 . toFixTree
