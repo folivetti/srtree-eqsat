@@ -232,26 +232,6 @@ rewritesBasic =
       , "x" * ("y" * "z") := ("x" * "y") * "z"
       , "x" * ("y" / "z") := ("x" * "y") / "z"
       , ("x" * "y") / "z" := "x" * ("y" / "z")
-      , ("a" * "x") * ("b" * "y") := ("a" * "b") * ("x" * "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "a" * "x" + "b" := "a" * ("x" + ("b" / "a")) :| is_const "a" :| is_const "b" :| is_not_const "x"
-      , "a" * "x" - "b" := "a" * ("x" - ("b" / "a")) :| is_const "a" :| is_const "b" :| is_not_const "x"
-      , "b" - "a" * "x" := "a" * (("b" / "a") - "x") :| is_const "a" :| is_const "b" :| is_not_const "x"
-      , "a" * "x" + "b" * "y" := "a" * ("x" + ("b" / "a") * "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "a" * "x" - "b" * "y" := "a" * ("x" - ("b" / "a") * "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "a" * "x" + "b" / "y" := "a" * ("x" + ("b" / "a") / "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "a" * "x" - "b" / "y" := "a" * ("x" - ("b" / "a") / "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-
-      , "a" / ("b" * "x") := ("a" / "b") / "x" :| is_const "a" :| is_const "b" :| is_not_const "x"
-      , "x" / ("b" * "y") := (1 / "b") * "x" / "y" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "x" / "a" + "b" := ("x" + ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x"
-      , "x" / "a" - "b" := ("x" - ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x"
-      , "b" - "x" / "a" := (("b" * "a") - "x") / "a" :| is_const "a" :| is_const "b" :| is_not_const "x"
-      , "x" / "a" + "b" * "y" := ("x" + ("b" * "a") * "y") / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "x" / "a" + "y" / "b" := ("x" + "y" / ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "x" / "a" - "b" * "y" := ("x" - ("b" * "a") * "y") / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "x" / "a" - "b" / "y" := ("x" - "y" / ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , ("b" + "a" * "x") / ("c" + "d" * "y") := ("a"/"d") * ("b" / "a" + "x") / ("c" / "d" + "y") :| is_const "a" :| is_const "b" :| is_const "c" :| is_const "d"
-      , ("b" + "x") / ("c" + "d" * "y") := (1/"d") * ("b" + "x") / ("c" / "d" + "y") :| is_const "b" :| is_const "c" :| is_const "d"
       -- identities
       , 0 + "x" := "x"
       , "x" - 0 := "x"
@@ -274,14 +254,15 @@ rewritesBasic =
       -- negate 
       , "x" - ( (-1) * "y") := "x" + "y" :| is_not_const "y"
       , "x" + negate "y" := "x" - "y" :| is_not_const "y"
-      , 0 - "x" := negate "x" :| is_not_const "x"
+      , 0 - "x" := negate "x" :| is_not_const "x" 
    ]
 
 rewritesFun :: [Rewrite (Maybe Double) SRTreeF]
 rewritesFun = [
-        log ("x" / "y") := log "x" - log "y" :| is_not_neg_consts "x" "y" :| is_not_zero "x" :| is_not_zero "y"
+        log ("x" * "y") := log "x" + log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
+       , log ("x" / "y") := log "x" - log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
       , log ("x" ** "y") := "y" * log "x" :| is_not_neg_consts "x" "x" :| is_not_zero "x"
-      , log 1 := 0
+      --, log 1 := 0
       , log (sqrt "x") := 0.5 * log "x" :| is_not_const "x"
       , log (exp "x") := "x" :| is_not_const "x"
       , exp (log "x") := "x" :| is_not_const "x"
@@ -293,9 +274,32 @@ rewritesFun = [
       , abs ("x" * "y") := abs "x" * abs "y"
     ]
 
+constFusion :: [Rewrite (Maybe Double) SRTreeF]
+constFusion = [
+        ("a" * "x") * ("b" * "y") := ("a" * "b") * ("x" * "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      ,  "a" * "x" + "b" := "a" * ("x" + ("b" / "a")) :| is_const "a" :| is_const "b" :| is_not_const "x"
+      -- , "a" * "x" - "b" := "a" * ("x" - ("b" / "a")) :| is_const "a" :| is_const "b" :| is_not_const "x"
+      -- , "b" - "a" * "x" := "a" * (("b" / "a") - "x") :| is_const "a" :| is_const "b" :| is_not_const "x"
+      -- , "a" * "x" + "b" * "y" := "a" * ("x" + ("b" / "a") * "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      -- , "a" * "x" - "b" * "y" := "a" * ("x" - ("b" / "a") * "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , "a" * "x" + "b" / "y" := "a" * ("x" + ("b" / "a") / "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , "a" * "x" - "b" / "y" := "a" * ("x" - ("b" / "a") / "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , "a" / ("b" * "x") := ("a" / "b") / "x" :| is_const "a" :| is_const "b" :| is_not_const "x"
+      , "x" / ("b" * "y") := (1 / "b") * "x" / "y" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , "x" / "a" + "b" := ("x" + ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x"
+      , "x" / "a" - "b" := ("x" - ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x"
+      , "b" - "x" / "a" := (("b" * "a") - "x") / "a" :| is_const "a" :| is_const "b" :| is_not_const "x"
+      , "x" / "a" + "b" * "y" := ("x" + ("b" * "a") * "y") / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , "x" / "a" + "y" / "b" := ("x" + "y" / ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , "x" / "a" - "b" * "y" := ("x" - ("b" * "a") * "y") / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , "x" / "a" - "b" / "y" := ("x" - "y" / ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , ("b" + "a" * "x") / ("c" + "d" * "y") := ("a"/"d") * ("b" / "a" + "x") / ("c" / "d" + "y") :| is_const "a" :| is_const "b" :| is_const "c" :| is_const "d"
+      , ("b" + "x") / ("c" + "d" * "y") := (1/"d") * ("b" + "x") / ("c" / "d" + "y") :| is_const "b" :| is_const "c" :| is_const "d" 
+    ]
 
-rewriteTree :: Fix SRTreeF -> Fix SRTreeF
-rewriteTree t = fst $ equalitySaturation' (BackoffScheduler 2500 30) t (rewritesBasic <> rewritesFun) cost
+rewriteTree, rewriteTreeFusion :: Fix SRTreeF -> Fix SRTreeF
+rewriteTree t = fst $ equalitySaturation' (BackoffScheduler 2500 30) t (constFusion <> rewritesBasic <> rewritesFun) cost
+rewriteTreeFusion t = fst $ equalitySaturation' (BackoffScheduler 2500 30) t constFusion cost
 
 rewriteUntilNoChange :: [Fix SRTreeF -> Fix SRTreeF] -> Int -> Fix SRTreeF -> Fix SRTreeF
 rewriteUntilNoChange _ 0 t = t
@@ -305,4 +309,4 @@ rewriteUntilNoChange rs n t
   where t' = head rs t
 
 simplifyEqSat :: SRTree Int Double -> SRTree Int Double
-simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteTree] 2 . toFixTree
+simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteTreeFusion, rewriteTree, rewriteTree] 3 . toFixTree
