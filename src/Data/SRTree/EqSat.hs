@@ -300,7 +300,7 @@ constFusion = [
     ]
 
 rewriteTree, rewriteTreeFusion :: Fix SRTreeF -> Fix SRTreeF
-rewriteTree t = fst $ equalitySaturation' (BackoffScheduler 500 10) t (rewritesFun <> constFusion <> rewritesBasic) cost
+rewriteTree t = fst $ equalitySaturation' (BackoffScheduler 300 10) t (rewritesFun <> constFusion <> rewritesBasic) cost
 rewriteTreeFusion t = fst $ equalitySaturation' (BackoffScheduler 300 10) t constFusion cost
 
 rewriteUntilNoChange :: [Fix SRTreeF -> Fix SRTreeF] -> Int -> Fix SRTreeF -> Fix SRTreeF
