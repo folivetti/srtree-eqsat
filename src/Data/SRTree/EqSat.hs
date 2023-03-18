@@ -277,9 +277,12 @@ constReduction :: [Rewrite (Maybe Double) SRTreeF]
 constReduction = [
       -- identities
         0 + "x" := "x"
+      , "x" + 0 := "x"
       , "x" - 0 := "x"
       , 1 * "x" := "x"
+      , "x" * 1 := "x"
       , 0 * "x" := 0
+      , "x" * 0 := 0
       , 0 / "x" := 0
       -- cancellations 
       , "x" - "x" := 0
@@ -319,7 +322,7 @@ rewriteFull, rewriteReduction, rewriteOut, rewriteFun :: Fix SRTreeF -> Fix SRTr
 rewriteFull = rewriteTree (constReduction <> constFusion <> rewritesFun <> rewritesBasic) 300 30 cost
 rewriteFun = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 cost
 rewriteOut = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 costOut
-rewriteReduction = rewriteTree (constReduction <> rewritesBasic) 300 10 cost
+rewriteReduction = rewriteTree (constReduction <> rewritesBasic) 300 20 cost
 
 rewriteUntilNoChange :: [Fix SRTreeF -> Fix SRTreeF] -> Int -> Fix SRTreeF -> Fix SRTreeF
 rewriteUntilNoChange _ 0 t = t
@@ -330,4 +333,4 @@ rewriteUntilNoChange rs n t
 
 simplifyEqSat :: SRTree Int Double -> SRTree Int Double
 -- simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteFun, rewriteFull] 4 . toFixTree
-simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteFull, rewriteReduction] 4 . toFixTree
+simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteReduction, rewriteFull] 5 . toFixTree
