@@ -316,7 +316,7 @@ constFusion = [
 rewriteTree rules n coolOff c t = fst $ equalitySaturation' (BackoffScheduler n coolOff) t rules c
 
 rewriteFull, rewriteReduction, rewriteOut, rewriteFun :: Fix SRTreeF -> Fix SRTreeF
-rewriteFull = rewriteTree (constReduction <> constFusion <> rewritesFun <> rewritesBasic) 500 20 costOut
+rewriteFull = rewriteTree (constReduction <> constFusion <> rewritesFun <> rewritesBasic) 500 20 cost
 rewriteFun = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 cost
 rewriteOut = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 costOut
 rewriteReduction = rewriteTree constReduction 300 10 cost
@@ -330,4 +330,4 @@ rewriteUntilNoChange rs n t
 
 simplifyEqSat :: SRTree Int Double -> SRTree Int Double
 -- simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteFun, rewriteFull] 4 . toFixTree
-simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteFull] 4 . toFixTree
+simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteReduction, rewriteFull] 4 . toFixTree
