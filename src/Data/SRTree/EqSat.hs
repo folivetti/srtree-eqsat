@@ -333,4 +333,4 @@ rewriteUntilNoChange rs n t
 
 simplifyEqSat :: SRTree Int Double -> SRTree Int Double
 -- simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteFun, rewriteFull] 4 . toFixTree
-simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteReduction, rewriteFull] 9 . toFixTree
+simplifyEqSat = relabelParams . toSRTree . rewriteReduction . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteReduction, rewriteFull] 5 . toFixTree
