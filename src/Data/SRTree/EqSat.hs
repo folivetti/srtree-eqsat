@@ -181,7 +181,7 @@ evalConstant = \case
 
 instance Language SRTreeF
 
-cost :: CostFunction SRTreeF Int
+cost, costOut :: CostFunction SRTreeF Int
 cost = \case
   ConstF _ -> 5
   VarF _ -> 1
@@ -192,6 +192,19 @@ cost = \case
   PowerF c1 c2 -> c1 + c2 + 1
   LogBaseF c1 c2 -> c1 + c2 + 1
   FunF _ c -> c + 1
+  PowF _ _ -> undefined
+  ParamF -> undefined
+
+costOut = \case
+  ConstF _ -> 5
+  VarF _ -> 1
+  AddF c1 c2 -> 2*c1 + 3*c2
+  SubF c1 c2 -> 2*c1 + 3*c2
+  MulF c1 c2 -> 2*c1 + 3*c2
+  DivF c1 c2 -> 2*c1 + 3*c2
+  PowerF c1 c2 -> 2*c1 + 3*c2
+  LogBaseF c1 c2 -> 2*c1 + 3*c2
+  FunF _ c -> 3*c
   PowF _ _ -> undefined
   ParamF -> undefined
 
@@ -228,43 +241,26 @@ rewritesBasic =
         "x" + "y" := "y" + "x"
       , "x" * "y" := "y" * "x"
       -- associativity
-      , "x" + ("y" + "z") := ("x" + "y") + "z"
-      , "x" * ("y" * "z") := ("x" * "y") * "z"
-      , "x" * ("y" / "z") := ("x" * "y") / "z"
+      , ("x" + "y") + "z" := "x" + ("y" + "z")
+      , ("x" * "y") * "z" := "x" * ("y" * "z")
+      -- , "x" * ("y" / "z") := ("x" * "y") / "z"
       , ("x" * "y") / "z" := "x" * ("y" / "z")
-      -- identities
-      , 0 + "x" := "x"
-      , "x" - 0 := "x"
-      , 1 * "x" := "x"
-      , 0 * "x" := 0
-      , 0 / "x" := 0
-      -- cancellations 
-      , "x" - "x" := 0
-      , "x" / "x" := 1 :| is_not_zero "x"
       -- distributive and factorization
-      , ("x" * "y") + ("x" * "z") := "x" * ("y" + "z")
       , "x" - ("y" + "z") := ("x" - "y") - "z"
       , "x" - ("y" - "z") := ("x" - "y") + "z"
       , negate ("x" + "y") := negate "x" - "y"
       , ("x" - "a") := "x" + negate "a" :| is_const "a" :| is_not_const "x"
       , ("x" - ("a" * "y")) := "x" + (negate "a" * "y") :| is_const "a" :| is_not_const "y"
       , (1 / "x") * (1 / "y") := 1 / ("x" * "y")
-      -- multiplication of inverse
-      , "x" * (1 / "x") := 1 :| is_not_zero "x"
-      -- negate 
-      , "x" - ( (-1) * "y") := "x" + "y" :| is_not_const "y"
-      , "x" + negate "y" := "x" - "y" :| is_not_const "y"
-      , 0 - "x" := negate "x" :| is_not_const "x" 
    ]
 
+-- Rules for nonlinear functions
 rewritesFun :: [Rewrite (Maybe Double) SRTreeF]
 rewritesFun = [
-        "x" ** 1 := "x"
-      , "x" ** "a" := 1 / ("x" ** negate "a") :| is_negative "a"
-      ,  log ("x" * "y") := log "x" + log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
-       , log ("x" / "y") := log "x" - log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
+        log ("x" * "y") := log "x" + log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
+      , "x" ** "a" * "x" ** "b" := "x" ** ("a" + "b")
+      , log ("x" / "y") := log "x" - log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
       , log ("x" ** "y") := "y" * log "x" :| is_not_neg_consts "y" "y" :| is_not_zero "y"
-      --, log 1 := 0
       , log (sqrt "x") := 0.5 * log "x" :| is_not_const "x"
       , log (exp "x") := "x" :| is_not_const "x"
       , exp (log "x") := "x" :| is_not_const "x"
@@ -276,39 +272,62 @@ rewritesFun = [
       , abs ("x" * "y") := abs "x" * abs "y" :| is_const "x"
     ]
 
-constFusion :: [Rewrite (Maybe Double) SRTreeF]
-constFusion = [
-        ("a" * "x") * ("b" * "y") := ("a" * "b") * ("x" * "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      ,  "a" * "x" + "b" := "a" * ("x" + ("b" / "a")) :| is_const "a" :| is_const "b" :| is_not_const "x"
-      -- , "a" * "x" - "b" := "a" * ("x" - ("b" / "a")) :| is_const "a" :| is_const "b" :| is_not_const "x"
-      -- , "b" - "a" * "x" := "a" * (("b" / "a") - "x") :| is_const "a" :| is_const "b" :| is_not_const "x"
-      -- , "a" * "x" + "b" * "y" := "a" * ("x" + ("b" / "a") * "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      -- , "a" * "x" - "b" * "y" := "a" * ("x" - ("b" / "a") * "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "a" * "x" + "b" / "y" := "a" * ("x" + ("b" / "a") / "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "a" * "x" - "b" / "y" := "a" * ("x" - ("b" / "a") / "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+-- Rules that reduces redundant parameters
+constReduction :: [Rewrite (Maybe Double) SRTreeF]
+constReduction = [
+      -- identities
+        0 + "x" := "x"
+      , "x" - 0 := "x"
+      , 1 * "x" := "x"
+      , 0 * "x" := 0
+      , 0 / "x" := 0
+      -- cancellations 
+      , "x" - "x" := 0
+      , "x" / "x" := 1 :| is_not_zero "x"
+      , "x" ** 1 := "x"
+      -- multiplication of inverse
+      , "x" * (1 / "x") := 1 :| is_not_zero "x"
+      , ("x" * "y") + ("x" * "z") := "x" * ("y" + "z")
+      -- negate 
+      , "x" - ( (-1) * "y") := "x" + "y" :| is_not_const "y"
+      , "x" + negate "y" := "x" - "y" :| is_not_const "y"
+      , 0 - "x" := negate "x" :| is_not_const "x" 
+      -- constant fusion
+      , ("a" * "x") * ("b" * "y") := ("a" * "b") * ("x" * "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
       , "a" / ("b" * "x") := ("a" / "b") / "x" :| is_const "a" :| is_const "b" :| is_not_const "x"
-      , "x" / ("b" * "y") := (1 / "b") * "x" / "y" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "x" / "a" + "b" := ("x" + ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x"
-      , "x" / "a" - "b" := ("x" - ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x"
-      , "b" - "x" / "a" := (("b" * "a") - "x") / "a" :| is_const "a" :| is_const "b" :| is_not_const "x"
-      , "x" / "a" + "b" * "y" := ("x" + ("b" * "a") * "y") / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "x" / "a" + "y" / "b" := ("x" + "y" / ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "x" / "a" - "b" * "y" := ("x" - ("b" * "a") * "y") / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , "x" / "a" - "b" / "y" := ("x" - "y" / ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-     -- , ("b" + "a" * "x") / ("c" + "d" * "y") := ("a"/"d") * ("b" / "a" + "x") / ("c" / "d" + "y") :| is_const "a" :| is_const "b" :| is_const "c" :| is_const "d"
-     -- , ("b" + "x") / ("c" + "d" * "y") := (1/"d") * ("b" + "x") / ("c" / "d" + "y") :| is_const "b" :| is_const "c" :| is_const "d" 
     ]
 
-rewriteTree, rewriteTreeFusion :: Fix SRTreeF -> Fix SRTreeF
-rewriteTree t = fst $ equalitySaturation' (BackoffScheduler 300 10) t (rewritesFun <> constFusion <> rewritesBasic) cost
-rewriteTreeFusion t = fst $ equalitySaturation' (BackoffScheduler 300 10) t constFusion cost
+-- Rules that moves parameters to the outside and to the left
+constFusion :: [Rewrite (Maybe Double) SRTreeF]
+constFusion = [
+        "a" * "x" + "b" := "a" * ("x" + ("b" / "a")) :| is_const "a" :| is_const "b" :| is_not_const "x"
+      , "a" * "x" + "b" / "y" := "a" * ("x" + ("b" / "a") / "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , "a" * "x" - "b" / "y" := "a" * ("x" - ("b" / "a") / "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , "x" / ("b" * "y") := (1 / "b") * "x" / "y" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , "x" / "a" + "b" := (1 / "a") * ("x" + ("b" * "a")) :| is_const "a" :| is_const "b" :| is_not_const "x"
+      , "x" / "a" - "b" := (1 / "a") * ("x" - ("b" * "a")) :| is_const "a" :| is_const "b" :| is_not_const "x"
+      , "b" - "x" / "a" := (1 / "a") * (("b" * "a") - "x") :| is_const "a" :| is_const "b" :| is_not_const "x"
+      , "x" / "a" + "b" * "y" := (1 / "a") * ("x" + ("b" * "a") * "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , "x" / "a" + "y" / "b" := (1 / "a") * ("x" + "y" / ("b" * "a")) :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , "x" / "a" - "b" * "y" := (1 / "a") * ("x" - ("b" * "a") * "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+      , "x" / "a" - "b" / "y" := (1 / "a") * ("x" - "y" / ("b" * "a")) :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
+    ]
+
+rewriteTree rules n coolOff c t = fst $ equalitySaturation' (BackoffScheduler n coolOff) t rules c
+
+rewriteFull, rewriteReduction, rewriteOut, rewriteFun :: Fix SRTreeF -> Fix SRTreeF
+rewriteFull = rewriteTree (constReduction <> constFusion <> rewritesFun <> rewritesBasic) 2500 10 costOut
+rewriteFun = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 cost
+rewriteOut = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 costOut
+rewriteReduction = rewriteTree constReduction 300 10 cost
 
 rewriteUntilNoChange :: [Fix SRTreeF -> Fix SRTreeF] -> Int -> Fix SRTreeF -> Fix SRTreeF
 rewriteUntilNoChange _ 0 t = t
 rewriteUntilNoChange rs n t
-  | False && t == t'   = t'
+  | t == t'   = t'
   | otherwise = rewriteUntilNoChange (tail rs <> [head rs]) (n-1) t'
   where t' = head rs t
 
 simplifyEqSat :: SRTree Int Double -> SRTree Int Double
-simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteTreeFusion, rewriteTree, rewriteTreeFusion, rewriteTree] 4 . toFixTree
+-- simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteFun, rewriteFull] 4 . toFixTree
+simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteFull] 4 . toFixTree
