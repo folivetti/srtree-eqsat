@@ -259,7 +259,8 @@ rewritesBasic =
 
 rewritesFun :: [Rewrite (Maybe Double) SRTreeF]
 rewritesFun = [
-        log ("x" * "y") := log "x" + log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
+        "x" ** 1 := "x"
+      ,  log ("x" * "y") := log "x" + log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
        , log ("x" / "y") := log "x" - log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
       , log ("x" ** "y") := "y" * log "x" :| is_not_neg_consts "y" "y" :| is_not_zero "y"
       --, log 1 := 0
@@ -298,13 +299,13 @@ constFusion = [
     ]
 
 rewriteTree, rewriteTreeFusion :: Fix SRTreeF -> Fix SRTreeF
-rewriteTree t = fst $ equalitySaturation' (BackoffScheduler 300 10) t (constFusion <> rewritesFun <> rewritesBasic) cost
+rewriteTree t = fst $ equalitySaturation' (BackoffScheduler 500 10) t (rewritesFun <> constFusion <> rewritesBasic) cost
 rewriteTreeFusion t = fst $ equalitySaturation' (BackoffScheduler 300 10) t constFusion cost
 
 rewriteUntilNoChange :: [Fix SRTreeF -> Fix SRTreeF] -> Int -> Fix SRTreeF -> Fix SRTreeF
 rewriteUntilNoChange _ 0 t = t
 rewriteUntilNoChange rs n t
-  | t == t'   = t'
+  | False && t == t'   = t'
   | otherwise = rewriteUntilNoChange (tail rs <> [head rs]) (n-1) t'
   where t' = head rs t
 
