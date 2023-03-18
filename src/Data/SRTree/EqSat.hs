@@ -269,7 +269,7 @@ rewritesFun = [
       , sqrt ("a" * ("x" - "y")) := sqrt (negate "a") * sqrt ("y" - "x") :| is_negative "a"
       , sqrt ("a" * ("b" + "y")) := sqrt (negate "a") * sqrt ("b" - "y") :| is_negative "a" :| is_negative "b"
       , sqrt ("a" / "x") := sqrt "a" / sqrt "x" :| is_not_neg_consts "a" "x"
-      , abs ("x" * "y") := abs "x" * abs "y" :| is_const "x"
+      , abs ("x" * "y") := abs "x" * abs "y" -- :| is_const "x"
     ]
 
 -- Rules that reduces redundant parameters
@@ -319,7 +319,7 @@ rewriteFull, rewriteReduction, rewriteOut, rewriteFun :: Fix SRTreeF -> Fix SRTr
 rewriteFull = rewriteTree (constReduction <> constFusion <> rewritesFun <> rewritesBasic) 300 30 cost
 rewriteFun = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 cost
 rewriteOut = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 costOut
-rewriteReduction = rewriteTree constReduction 300 10 cost
+rewriteReduction = rewriteTree (constReduction <> rewritesBasic) 300 10 cost
 
 rewriteUntilNoChange :: [Fix SRTreeF -> Fix SRTreeF] -> Int -> Fix SRTreeF -> Fix SRTreeF
 rewriteUntilNoChange _ 0 t = t
@@ -330,4 +330,4 @@ rewriteUntilNoChange rs n t
 
 simplifyEqSat :: SRTree Int Double -> SRTree Int Double
 -- simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteFun, rewriteFull] 4 . toFixTree
-simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteReduction, rewriteFull] 4 . toFixTree
+simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteFull, rewriteReduction] 4 . toFixTree
