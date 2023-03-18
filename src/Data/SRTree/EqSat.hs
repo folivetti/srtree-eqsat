@@ -260,6 +260,7 @@ rewritesBasic =
 rewritesFun :: [Rewrite (Maybe Double) SRTreeF]
 rewritesFun = [
         "x" ** 1 := "x"
+      , "x" ** "a" := 1 / ("x" ** negate "a") :| is_negative "a"
       ,  log ("x" * "y") := log "x" + log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
        , log ("x" / "y") := log "x" - log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
       , log ("x" ** "y") := "y" * log "x" :| is_not_neg_consts "y" "y" :| is_not_zero "y"
@@ -294,8 +295,8 @@ constFusion = [
       , "x" / "a" + "y" / "b" := ("x" + "y" / ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
       , "x" / "a" - "b" * "y" := ("x" - ("b" * "a") * "y") / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
       , "x" / "a" - "b" / "y" := ("x" - "y" / ("b" * "a")) / "a" :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
-      , ("b" + "a" * "x") / ("c" + "d" * "y") := ("a"/"d") * ("b" / "a" + "x") / ("c" / "d" + "y") :| is_const "a" :| is_const "b" :| is_const "c" :| is_const "d"
-      , ("b" + "x") / ("c" + "d" * "y") := (1/"d") * ("b" + "x") / ("c" / "d" + "y") :| is_const "b" :| is_const "c" :| is_const "d" 
+     -- , ("b" + "a" * "x") / ("c" + "d" * "y") := ("a"/"d") * ("b" / "a" + "x") / ("c" / "d" + "y") :| is_const "a" :| is_const "b" :| is_const "c" :| is_const "d"
+     -- , ("b" + "x") / ("c" + "d" * "y") := (1/"d") * ("b" + "x") / ("c" / "d" + "y") :| is_const "b" :| is_const "c" :| is_const "d" 
     ]
 
 rewriteTree, rewriteTreeFusion :: Fix SRTreeF -> Fix SRTreeF
