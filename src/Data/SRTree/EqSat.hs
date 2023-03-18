@@ -321,7 +321,7 @@ rewriteTree rules n coolOff c t = fst $ equalitySaturation' (BackoffScheduler n 
 rewriteFull, rewriteReduction, rewriteOut, rewriteFun :: Fix SRTreeF -> Fix SRTreeF
 rewriteFull = rewriteTree (constReduction <> constFusion <> rewritesFun <> rewritesBasic) 300 30 cost
 rewriteFun = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 cost
-rewriteOut = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 costOut
+rewriteOut = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 cost
 rewriteReduction = rewriteTree (constReduction <> rewritesBasic) 300 20 cost
 
 rewriteUntilNoChange :: [Fix SRTreeF -> Fix SRTreeF] -> Int -> Fix SRTreeF -> Fix SRTreeF
