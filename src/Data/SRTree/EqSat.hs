@@ -10,7 +10,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
-module Data.SRTree.EqSat ( simplifyEqSat ) where
+module Data.SRTree.EqSat ( simplifyEqSat, countParams ) where
 
 import Control.Applicative (liftA2)
 import Control.Monad (unless)
@@ -181,7 +181,7 @@ evalConstant = \case
 
 instance Language SRTreeF
 
-cost, costOut :: CostFunction SRTreeF Int
+cost :: CostFunction SRTreeF Int
 cost = \case
   ConstF _ -> 5
   VarF _ -> 1
@@ -192,19 +192,6 @@ cost = \case
   PowerF c1 c2 -> c1 + c2 + 1
   LogBaseF c1 c2 -> c1 + c2 + 1
   FunF _ c -> c + 1
-  PowF _ _ -> undefined
-  ParamF -> undefined
-
-costOut = \case
-  ConstF _ -> 5
-  VarF _ -> 1
-  AddF c1 c2 -> 2*c1 + 3*c2
-  SubF c1 c2 -> 2*c1 + 3*c2
-  MulF c1 c2 -> 2*c1 + 3*c2
-  DivF c1 c2 -> 2*c1 + 3*c2
-  PowerF c1 c2 -> 2*c1 + 3*c2
-  LogBaseF c1 c2 -> 2*c1 + 3*c2
-  FunF _ c -> 3*c
   PowF _ _ -> undefined
   ParamF -> undefined
 
@@ -288,6 +275,8 @@ constReduction = [
       , "x" - "x" := 0
       , "x" / "x" := 1 :| is_not_zero "x"
       , "x" ** 1 := "x"
+      , 0 ** "x" := 0
+      , 1 ** "x" := 1
       -- multiplication of inverse
       , "x" * (1 / "x") := 1 :| is_not_zero "x"
       , ("x" * "y") + ("x" * "z") := "x" * ("y" + "z")
@@ -316,13 +305,12 @@ constFusion = [
       , "x" / "a" - "b" / "y" := (1 / "a") * ("x" - "y" / ("b" * "a")) :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
     ]
 
+rewriteTree :: (Analysis a l, Language l, Ord cost) => [Rewrite a l] -> Int -> Int -> CostFunction l cost -> Fix l -> Fix l
 rewriteTree rules n coolOff c t = fst $ equalitySaturation' (BackoffScheduler n coolOff) t rules c
 
-rewriteFull, rewriteReduction, rewriteOut, rewriteFun :: Fix SRTreeF -> Fix SRTreeF
-rewriteFull = rewriteTree (constReduction <> constFusion <> rewritesFun <> rewritesBasic) 300 30 cost
-rewriteFun = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 cost
-rewriteOut = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 cost
-rewriteReduction = rewriteTree (constReduction <> rewritesBasic) 300 20 cost
+rewriteAll, rewriteConst :: Fix SRTreeF -> Fix SRTreeF
+rewriteAll   = rewriteTree  (rewritesBasic <> constReduction <> constFusion <> rewritesFun) 2500 30 cost
+rewriteConst = rewriteTree constReduction 100 10 cost
 
 rewriteUntilNoChange :: [Fix SRTreeF -> Fix SRTreeF] -> Int -> Fix SRTreeF -> Fix SRTreeF
 rewriteUntilNoChange _ 0 t = t
@@ -332,5 +320,51 @@ rewriteUntilNoChange rs n t
   where t' = head rs t
 
 simplifyEqSat :: SRTree Int Double -> SRTree Int Double
+simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteAll] 2 . rewriteConst . toFixTree
+
+countParams :: SRTree a Double -> Int
+countParams = sum . go
+  where
+    go :: SRTree a Double -> [Int]
+    go Empty         = []
+    go (Var _)       = []
+    go (Param _)     = []
+    go (Const v)     = [1 | fromIntegral (round v :: Int) /= v]
+    go (Fun _ t)     = go t
+    go (Pow t _)     = go t
+    go (Add l r)     = go l <> go r
+    go (Sub l r)     = go l <> go r
+    go (Mul l r)     = go l <> go r
+    go (Div l r)     = go l <> go r
+    go (Power l r)   = go l <> go r
+    go (LogBase l r) = go l <> go r
+
+
+-- debug test, to be removed
+{-
+rewriteFull, rewriteReduction, rewriteOut, rewriteFun :: Fix SRTreeF -> Fix SRTreeF
+rewriteFull = rewriteTree (constReduction <> constFusion <> rewritesFun <> rewritesBasic) 300 30 cost
+rewriteFun = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 cost
+rewriteOut = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 cost
+rewriteReduction = rewriteTree (constReduction <> rewritesBasic) 300 20 cost
+rewriteConst = rewriteTree constReduction 100 10 cost
+
 -- simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteFun, rewriteFull] 4 . toFixTree
-simplifyEqSat = relabelParams . toSRTree . rewriteReduction . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteReduction, rewriteFull] 5 . toFixTree
+-- simplifyEqSat False = relabelParams . toSRTree . rewriteConst . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteReduction, rewriteFull] 5 . rewriteConst . toFixTree
+
+fst $ equalitySaturation' (BackoffScheduler 2500 30) t (rewritesBasic <> constReduction <> constFusion <> rewritesFun) cost
+
+
+costOut = \case
+  ConstF _ -> 5
+  VarF _ -> 1
+  AddF c1 c2 -> 2*c1 + 3*c2
+  SubF c1 c2 -> 2*c1 + 3*c2
+  MulF c1 c2 -> 2*c1 + 3*c2
+  DivF c1 c2 -> 2*c1 + 3*c2
+  PowerF c1 c2 -> 2*c1 + 3*c2
+  LogBaseF c1 c2 -> 2*c1 + 3*c2
+  FunF _ c -> 3*c
+  PowF _ _ -> undefined
+  ParamF -> undefined
+-}

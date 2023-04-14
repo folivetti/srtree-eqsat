@@ -12,15 +12,15 @@ packages:
   original:
     hackage: srtree-0.1.2.1
 - completed:
-    commit: 9862af0396aaea5fa6b0685fb74032d7d52405ce
+    commit: 2a04c6e916c5f2383215d63c25fc5d0edb6ddcaf
     git: https://github.com/folivetti/pandoc-symreg.git
     name: pandoc-symreg
     pantry-tree:
-      sha256: 41228c09df3d00d39fcb6a02424866dc1a038010a4312d0ed85d8a7e7285458d
+      sha256: 9cf7f8ecec636251ff9162432c660343f58b75ddd83a2c69c187498be512d0df
       size: 2062
     version: 0.1.1.0
   original:
-    commit: 9862af0396aaea5fa6b0685fb74032d7d52405ce
+    commit: 2a04c6e916c5f2383215d63c25fc5d0edb6ddcaf
     git: https://github.com/folivetti/pandoc-symreg.git
 - completed:
     hackage: hegg-0.3.0.0@sha256:913a91c7326a767626d6bc949ea38af857cc6dee22b3e49270f7342e2b2bf762,5718

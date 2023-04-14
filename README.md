@@ -5,9 +5,13 @@ The simplification has the main objective of reparameterizing the expression wit
 
 ## Instalation
 
+First you need to install Haskell stack (https://docs.haskellstack.org/en/stable/)[https://docs.haskellstack.org/en/stable/], and then you can run:
+
 ```bash
 stack install
 ```
+
+Optionally, you can download the release binaries from this repository.
 
 ## Command line help:
 
