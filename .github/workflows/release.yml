@@ -8,6 +8,7 @@ on:
 
 jobs:
   create_release:
+    permissions: write-all
     name: Create Github Release
     runs-on: ubuntu-latest
     outputs:
