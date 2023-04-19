@@ -11,7 +11,7 @@ First you need to install Haskell stack (https://docs.haskellstack.org/en/stable
 stack install
 ```
 
-Optionally, you can download the release binaries from this repository.
+Optionally, you can download the release binaries from this repository (https://github.com/folivetti/srtree-eqsat/releases).
 
 ## Command line help:
 
