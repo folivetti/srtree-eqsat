@@ -3,15 +3,11 @@
 A CLI tool to simplify Symbolic Regression expressions using Equality Saturation.
 The simplification has the main objective of reparameterizing the expression with a smaller number of parameters.
 
+**NOTE: ** this tool will be discontinued and the simplification cli can be performed using https://github.com/folivetti/pandoc-symreg
+
 ## Instalation
 
-First you need to install Haskell stack (https://docs.haskellstack.org/en/stable/)[https://docs.haskellstack.org/en/stable/], and then you can run:
-
-```bash
-stack install
-```
-
-Optionally, you can download the release binaries from this repository (https://github.com/folivetti/srtree-eqsat/releases).
+You can download the release binaries from this repository (https://github.com/folivetti/srtree-eqsat/releases).
 
 ## Command line help:
 
