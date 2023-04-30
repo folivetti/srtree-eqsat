@@ -1,4 +1,5 @@
 {-# language DeriveTraversable #-}
+{-# language StandaloneDeriving #-}
 {-# language LambdaCase #-}
 {-# language TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -10,7 +11,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
-module Data.SRTree.EqSat ( simplifyEqSat, countParams ) where
+module Data.SRTree.EqSat ( simplifyEqSat ) where
 
 import Control.Applicative (liftA2)
 import Control.Monad (unless)
@@ -29,130 +30,53 @@ import Data.IntMap.Strict qualified as IM
 import Data.Maybe (isJust, isNothing)
 import Data.Ord.Deriving ( deriveOrd1 )
 import Data.SRTree
+import Data.SRTree.Recursion qualified as R
 import Data.Set qualified as S
 import Text.Show.Deriving ( deriveShow1 )
 
-data SRTreeF a = VarF Int
-               | ConstF Double
-               | ParamF
-               | FunF Function a
-               | PowF a Int
-               | AddF a a
-               | SubF a a
-               | MulF a a
-               | DivF a a
-               | PowerF a a
-               | LogBaseF a a
-               deriving (Functor, Foldable, Traversable)
+deriving instance Foldable SRTree
+deriving instance Traversable SRTree
 
-deriveEq1 ''SRTreeF
-deriveOrd1 ''SRTreeF
-deriveShow1 ''SRTreeF
+deriveEq1 ''SRTree
+deriveOrd1 ''SRTree
+deriveShow1 ''SRTree
 
-toFixTree :: SRTree Int Double -> Fix SRTreeF
-toFixTree (Const x)     = Fix (ConstF x)
-toFixTree (Var x)       = Fix (VarF x)
-toFixTree (Param _)     = Fix ParamF
-toFixTree (Add l r)     = Fix (AddF (toFixTree l) (toFixTree r))
-toFixTree (Sub l r)     = Fix (SubF (toFixTree l) (toFixTree r))
-toFixTree (Mul l r)     = Fix (MulF (toFixTree l) (toFixTree r))
-toFixTree (Div l r)     = Fix (DivF (toFixTree l) (toFixTree r))
-toFixTree (Power l r)   = Fix (PowerF (toFixTree l) (toFixTree r))
-toFixTree (LogBase l r) = Fix (LogBaseF (toFixTree l) (toFixTree r))
-toFixTree (Fun f n)     = Fix (FunF f (toFixTree n))
-toFixTree (Pow n i)     = Fix (PowerF (toFixTree n) (Fix (ConstF $ fromIntegral i))) -- integral power can't be used for pattern rules
-toFixTree Empty         = undefined
-
-toSRTree :: Fix SRTreeF -> SRTree Int Double
-toSRTree (Fix (ConstF x)) = Const x
-toSRTree (Fix (VarF x)) = Var x
-toSRTree (Fix ParamF) = Param 0
-toSRTree (Fix (AddF c1 c2)) = Add (toSRTree c1) (toSRTree c2)
-toSRTree (Fix (SubF c1 c2)) = Sub (toSRTree c1) (toSRTree c2)
-toSRTree (Fix (MulF c1 c2)) = Mul (toSRTree c1) (toSRTree c2)
-toSRTree (Fix (DivF c1 c2)) = Div (toSRTree c1) (toSRTree c2)
-toSRTree (Fix (PowerF c1 c2)) = Power (toSRTree c1) (toSRTree c2)
-toSRTree (Fix (LogBaseF c1 c2)) = LogBase (toSRTree c1) (toSRTree c2)
-toSRTree (Fix (FunF f c)) = Fun f (toSRTree c)
-toSRTree (Fix (PowF f i)) = Pow (toSRTree f) i -- will never exists
-
-instance Num (Fix SRTreeF) where
-  l + r = Fix $ AddF l r
-  l - r = Fix $ SubF l r
-  l * r = Fix $ MulF l r
-  abs   = Fix . FunF Abs
+instance Num (Pattern SRTree) where
+  l + r = NonVariablePattern $ Bin Add l r
+  l - r = NonVariablePattern $ Bin Sub l r
+  l * r = NonVariablePattern $ Bin Mul l r
+  abs   = NonVariablePattern . Uni Abs
 
   negate t    = fromInteger (-1) * t
   signum _    = undefined
-  fromInteger = Fix . ConstF . fromInteger
+  fromInteger = NonVariablePattern . Const . fromInteger
 
-instance OptIntPow (Fix SRTreeF) where
-    t ^. x = Fix (PowF t x)
+instance Fractional (Pattern SRTree) where
+    (/) a b      = NonVariablePattern $ Bin Div a b
+    fromRational = NonVariablePattern . Const . fromRational
 
-instance Fractional (Fix SRTreeF) where
-    (/) a b = Fix (DivF a b)
-    fromRational = Fix . ConstF . fromRational
+instance Floating (Pattern SRTree) where
+  pi      = NonVariablePattern $ Const pi
+  exp     = NonVariablePattern . Uni Exp
+  log     = NonVariablePattern . Uni Log
+  sqrt    = NonVariablePattern . Uni Sqrt
+  sin     = NonVariablePattern . Uni Sin
+  cos     = NonVariablePattern . Uni Cos
+  tan     = NonVariablePattern . Uni Tan
+  asin    = NonVariablePattern . Uni ASin
+  acos    = NonVariablePattern . Uni ACos
+  atan    = NonVariablePattern . Uni ATan
+  sinh    = NonVariablePattern . Uni Sinh
+  cosh    = NonVariablePattern . Uni Cosh
+  tanh    = NonVariablePattern . Uni Tanh
+  asinh   = NonVariablePattern . Uni ASinh
+  acosh   = NonVariablePattern . Uni ACosh
+  atanh   = NonVariablePattern . Uni ATanh
 
-instance Floating (Fix SRTreeF) where
-  pi      = Fix (ConstF pi)
-  exp     = Fix . FunF Exp
-  log     = Fix . FunF Log
-  sqrt    = Fix . FunF Sqrt
-  sin     = Fix . FunF Sin
-  cos     = Fix . FunF Cos
-  tan     = Fix . FunF Tan
-  asin    = Fix . FunF ASin
-  acos    = Fix . FunF ACos
-  atan    = Fix . FunF ATan
-  sinh    = Fix . FunF Sinh
-  cosh    = Fix . FunF Cosh
-  tanh    = Fix . FunF Tanh
-  asinh   = Fix . FunF ASinh
-  acosh   = Fix . FunF ACosh
-  atanh   = Fix . FunF ATanh
+  l ** r      = NonVariablePattern (Bin Power l r)
+  logBase l r = undefined
 
-  l ** r      = Fix (PowerF l r)
-  logBase l r = Fix (LogBaseF l r)
-
-instance Num (Pattern SRTreeF) where
-  l + r = NonVariablePattern $ AddF l r
-  l - r = NonVariablePattern $ SubF l r
-  l * r = NonVariablePattern $ MulF l r
-  abs   = NonVariablePattern . FunF Abs
-
-  negate t    = fromInteger (-1) * t
-  signum _    = undefined
-  fromInteger = NonVariablePattern . ConstF . fromInteger
-
-instance OptIntPow (Pattern SRTreeF) where
-    t ^. x = NonVariablePattern (PowF t x)
-
-instance Fractional (Pattern SRTreeF) where
-    (/) a b      = NonVariablePattern (DivF a b)
-    fromRational = NonVariablePattern . ConstF . fromRational
-
-instance Floating (Pattern SRTreeF) where
-  pi      = NonVariablePattern (ConstF pi)
-  exp     = NonVariablePattern . FunF Exp
-  log     = NonVariablePattern . FunF Log
-  sqrt    = NonVariablePattern . FunF Sqrt
-  sin     = NonVariablePattern . FunF Sin
-  cos     = NonVariablePattern . FunF Cos
-  tan     = NonVariablePattern . FunF Tan
-  asin    = NonVariablePattern . FunF ASin
-  acos    = NonVariablePattern . FunF ACos
-  atan    = NonVariablePattern . FunF ATan
-  sinh    = NonVariablePattern . FunF Sinh
-  cosh    = NonVariablePattern . FunF Cosh
-  tanh    = NonVariablePattern . FunF Tanh
-  asinh   = NonVariablePattern . FunF ASinh
-  acosh   = NonVariablePattern . FunF ACosh
-  atanh   = NonVariablePattern . FunF ATanh
-
-  l ** r      = NonVariablePattern (PowerF l r)
-  logBase l r = NonVariablePattern (LogBaseF l r)
-
-instance Analysis (Maybe Double) SRTreeF where
+instance Analysis (Maybe Double) SRTree where
     -- type Domain SRTreeF = Maybe Double
     makeA = evalConstant -- ((\c -> egr L.^._class c._data) <$> e)
     joinA ma mb = do
@@ -162,67 +86,59 @@ instance Analysis (Maybe Double) SRTreeF where
         pure a
     modifyA cl = case cl L.^._data of
                  Nothing -> (cl, [])
-                 Just d -> ((_nodes %~ S.filter (F.null .unNode)) cl, [Fix (ConstF d)])
+                 Just d -> ((_nodes %~ S.filter (F.null .unNode)) cl, [Fix (Const d)])
 
-evalConstant :: SRTreeF (Maybe Double) -> Maybe Double
+evalConstant :: SRTree (Maybe Double) -> Maybe Double
 evalConstant = \case
     -- Exception: Negative exponent: BinOp Pow e1 e2 -> liftA2 (^) e1 (round <$> e2 :: Maybe Integer)
-    DivF e1 e2 -> liftA2 (/) e1 e2
-    SubF e1 e2 -> liftA2 (-) e1 e2
-    MulF e1 e2 -> liftA2 (*) e1 e2
-    AddF e1 e2 -> liftA2 (+) e1 e2
-    PowF e i -> (^^ i) <$> e
-    PowerF e1 e2 -> liftA2 (**) e1 e2
-    LogBaseF e1 e2 -> liftA2 logBase e1 e2
-    FunF f e1 -> evalFun f <$> e1
-    VarF _ -> Nothing
-    ConstF x -> Just x -- TODO: investigate why it cannot handle NaN
-    ParamF -> Nothing
+    Bin Div e1 e2 -> liftA2 (/) e1 e2
+    Bin Sub e1 e2 -> liftA2 (-) e1 e2
+    Bin Mul e1 e2 -> liftA2 (*) e1 e2
+    Bin Add e1 e2 -> liftA2 (+) e1 e2
+    Bin Power e1 e2 -> liftA2 (**) e1 e2
+    Uni f e1 -> evalFun f <$> e1
+    Var _ -> Nothing
+    Const x -> Just x -- TODO: investigate why it cannot handle NaN
+    Param _ -> Nothing
 
-instance Language SRTreeF
+instance Language SRTree
 
-cost :: CostFunction SRTreeF Int
+cost :: CostFunction SRTree Int
 cost = \case
-  ConstF _ -> 5
-  VarF _ -> 1
-  AddF c1 c2 -> c1 + c2 + 1
-  SubF c1 c2 -> c1 + c2 + 1
-  MulF c1 c2 -> c1 + c2 + 1
-  DivF c1 c2 -> c1 + c2 + 1
-  PowerF c1 c2 -> c1 + c2 + 1
-  LogBaseF c1 c2 -> c1 + c2 + 1
-  FunF _ c -> c + 1
-  PowF _ _ -> undefined
-  ParamF -> undefined
+  Const _ -> 5
+  Var _ -> 1
+  Bin _ c1 c2 -> c1 + c2 + 1
+  Uni _ c -> c + 1
+  Param _ -> 5
 
-unsafeGetSubst :: Pattern SRTreeF -> Subst -> ClassId
+unsafeGetSubst :: Pattern SRTree -> Subst -> ClassId
 unsafeGetSubst (NonVariablePattern _) _ = error "unsafeGetSubst: NonVariablePattern; expecting VariablePattern"
 unsafeGetSubst (VariablePattern v) subst = case IM.lookup v subst of
       Nothing -> error "Searching for non existent bound var in conditional"
       Just class_id -> class_id
 
-is_not_zero :: Pattern SRTreeF -> RewriteCondition (Maybe Double) SRTreeF
+is_not_zero :: Pattern SRTree -> RewriteCondition (Maybe Double) SRTree
 is_not_zero v subst egr =
     egr L.^._class (unsafeGetSubst v subst)._data /= Just 0
 
-is_not_neg_consts :: Pattern SRTreeF -> Pattern SRTreeF -> RewriteCondition (Maybe Double) SRTreeF
+is_not_neg_consts :: Pattern SRTree -> Pattern SRTree -> RewriteCondition (Maybe Double) SRTree
 is_not_neg_consts v1 v2 subst egr =
     (fmap (>=0) (egr L.^._class (unsafeGetSubst v1 subst)._data) == Just True) ||
     (fmap (>=0) (egr L.^._class (unsafeGetSubst v2 subst)._data) == Just True)
 
-is_negative :: Pattern SRTreeF -> RewriteCondition (Maybe Double) SRTreeF
+is_negative :: Pattern SRTree -> RewriteCondition (Maybe Double) SRTree
 is_negative v subst egr =
     fmap (<0) (egr L.^._class (unsafeGetSubst v subst)._data) == Just True
 
-is_const :: Pattern SRTreeF -> RewriteCondition (Maybe Double) SRTreeF
+is_const :: Pattern SRTree -> RewriteCondition (Maybe Double) SRTree
 is_const v subst egr =
     isJust (egr L.^._class (unsafeGetSubst v subst)._data)
 
-is_not_const :: Pattern SRTreeF -> RewriteCondition (Maybe Double) SRTreeF
+is_not_const :: Pattern SRTree -> RewriteCondition (Maybe Double) SRTree
 is_not_const v subst egr =
     isNothing (egr L.^._class (unsafeGetSubst v subst)._data)
 
-rewritesBasic :: [Rewrite (Maybe Double) SRTreeF]
+rewritesBasic :: [Rewrite (Maybe Double) SRTree]
 rewritesBasic =
     [   -- commutativity
         "x" + "y" := "y" + "x"
@@ -242,7 +158,7 @@ rewritesBasic =
    ]
 
 -- Rules for nonlinear functions
-rewritesFun :: [Rewrite (Maybe Double) SRTreeF]
+rewritesFun :: [Rewrite (Maybe Double) SRTree]
 rewritesFun = [
         log ("x" * "y") := log "x" + log "y" :| is_not_neg_consts "x" "x" :| is_not_zero "x" 
       , "x" ** "a" * "x" ** "b" := "x" ** ("a" + "b")
@@ -260,7 +176,7 @@ rewritesFun = [
     ]
 
 -- Rules that reduces redundant parameters
-constReduction :: [Rewrite (Maybe Double) SRTreeF]
+constReduction :: [Rewrite (Maybe Double) SRTree]
 constReduction = [
       -- identities
         0 + "x" := "x"
@@ -290,7 +206,7 @@ constReduction = [
     ]
 
 -- Rules that moves parameters to the outside and to the left
-constFusion :: [Rewrite (Maybe Double) SRTreeF]
+constFusion :: [Rewrite (Maybe Double) SRTree]
 constFusion = [
         "a" * "x" + "b" := "a" * ("x" + ("b" / "a")) :| is_const "a" :| is_const "b" :| is_not_const "x"
       , "a" * "x" + "b" / "y" := "a" * ("x" + ("b" / "a") / "y") :| is_const "a" :| is_const "b" :| is_not_const "x" :| is_not_const "y"
@@ -308,63 +224,34 @@ constFusion = [
 rewriteTree :: (Analysis a l, Language l, Ord cost) => [Rewrite a l] -> Int -> Int -> CostFunction l cost -> Fix l -> Fix l
 rewriteTree rules n coolOff c t = fst $ equalitySaturation' (BackoffScheduler n coolOff) t rules c
 
-rewriteAll, rewriteConst :: Fix SRTreeF -> Fix SRTreeF
+rewriteAll, rewriteConst :: Fix SRTree -> Fix SRTree
 rewriteAll   = rewriteTree  (rewritesBasic <> constReduction <> constFusion <> rewritesFun) 2500 30 cost
 rewriteConst = rewriteTree constReduction 100 10 cost
 
-rewriteUntilNoChange :: [Fix SRTreeF -> Fix SRTreeF] -> Int -> Fix SRTreeF -> Fix SRTreeF
+rewriteUntilNoChange :: [Fix SRTree -> Fix SRTree] -> Int -> Fix SRTree -> Fix SRTree
 rewriteUntilNoChange _ 0 t = t
 rewriteUntilNoChange rs n t
   | t == t'   = t'
   | otherwise = rewriteUntilNoChange (tail rs <> [head rs]) (n-1) t'
   where t' = head rs t
 
-simplifyEqSat :: SRTree Int Double -> SRTree Int Double
-simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteAll] 2 . rewriteConst . toFixTree
+simplifyEqSat :: R.Fix SRTree -> R.Fix SRTree
+simplifyEqSat = relabelParams . fromEqFix . rewriteUntilNoChange [rewriteAll] 2 . rewriteConst . toEqFix
 
-countParams :: SRTree a Double -> Int
-countParams = sum . go
+fromEqFix :: Fix SRTree -> R.Fix SRTree
+fromEqFix = cata alg
   where
-    go :: SRTree a Double -> [Int]
-    go Empty         = []
-    go (Var _)       = []
-    go (Param _)     = []
-    go (Const v)     = [1 | fromIntegral (round v :: Int) /= v]
-    go (Fun _ t)     = go t
-    go (Pow t _)     = go t
-    go (Add l r)     = go l <> go r
-    go (Sub l r)     = go l <> go r
-    go (Mul l r)     = go l <> go r
-    go (Div l r)     = go l <> go r
-    go (Power l r)   = go l <> go r
-    go (LogBase l r) = go l <> go r
+    alg (Const x) = R.Fix (Const x)
+    alg (Var ix) = R.Fix (Var ix)
+    alg (Param ix) = R.Fix (Param ix)
+    alg (Bin op l r) = R.Fix (Bin op l r)
+    alg (Uni f t) = R.Fix (Uni f t)
 
-
--- debug test, to be removed
-{-
-rewriteFull, rewriteReduction, rewriteOut, rewriteFun :: Fix SRTreeF -> Fix SRTreeF
-rewriteFull = rewriteTree (constReduction <> constFusion <> rewritesFun <> rewritesBasic) 300 30 cost
-rewriteFun = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 cost
-rewriteOut = rewriteTree (constReduction <> constFusion <> rewritesFun) 300 10 cost
-rewriteReduction = rewriteTree (constReduction <> rewritesBasic) 300 20 cost
-rewriteConst = rewriteTree constReduction 100 10 cost
-
--- simplifyEqSat = relabelParams . toSRTree . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteFun, rewriteFull] 4 . toFixTree
--- simplifyEqSat False = relabelParams . toSRTree . rewriteConst . rewriteUntilNoChange [rewriteReduction, rewriteOut, rewriteReduction, rewriteFull] 5 . rewriteConst . toFixTree
-
-fst $ equalitySaturation' (BackoffScheduler 2500 30) t (rewritesBasic <> constReduction <> constFusion <> rewritesFun) cost
-
-
-costOut = \case
-  ConstF _ -> 5
-  VarF _ -> 1
-  AddF c1 c2 -> 2*c1 + 3*c2
-  SubF c1 c2 -> 2*c1 + 3*c2
-  MulF c1 c2 -> 2*c1 + 3*c2
-  DivF c1 c2 -> 2*c1 + 3*c2
-  PowerF c1 c2 -> 2*c1 + 3*c2
-  LogBaseF c1 c2 -> 2*c1 + 3*c2
-  FunF _ c -> 3*c
-  PowF _ _ -> undefined
-  ParamF -> undefined
--}
+toEqFix :: R.Fix SRTree -> Fix SRTree
+toEqFix = R.cata alg
+  where
+    alg (Const x) = Fix (Const x)
+    alg (Var ix) = Fix (Var ix)
+    alg (Param ix) = Fix (Param ix)
+    alg (Bin op l r) = Fix (Bin op l r)
+    alg (Uni f t) = Fix (Uni f t)
