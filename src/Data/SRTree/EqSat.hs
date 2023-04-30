@@ -143,6 +143,9 @@ rewritesBasic =
     [   -- commutativity
         "x" + "y" := "y" + "x"
       , "x" * "y" := "y" * "x"
+      , "x" * "x" := "x" ** 2
+      , ("x" ** "a") * "x" := "x" ** ("a" + 1)
+      , ("x" ** "a") * ("x" ** "b") := "x" ** ("a" + "b")
       -- associativity
       , ("x" + "y") + "z" := "x" + ("y" + "z")
       , ("x" * "y") * "z" := "x" * ("y" * "z")
