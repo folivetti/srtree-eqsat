@@ -29,7 +29,7 @@ import Data.Foldable qualified as F
 import Data.IntMap.Strict qualified as IM
 import Data.Maybe (isJust, isNothing)
 import Data.Ord.Deriving ( deriveOrd1 )
-import Data.SRTree
+import Data.SRTree hiding (Fix(..))
 import Data.SRTree.Recursion qualified as R
 import Data.Set qualified as S
 import Text.Show.Deriving ( deriveShow1 )
