@@ -5,12 +5,19 @@
 
 packages:
 - completed:
-    hackage: srtree-1.0.0.1@sha256:bc27302c066bfce547a9279314349b9dadb5c3229109ed35cbdc13610fe40722,2113
+    hackage: srtree-1.0.0.4@sha256:66c147119adf022d0ae8dc59ffb0582595836152a96124838da16411a45559cb,1742
     pantry-tree:
-      sha256: 63845788ce5e88eb7b6b33b719050d42a896ede5794a9ab4b85de56bcbee2d3a
-      size: 684
+      sha256: 5c8df2908e2ce8bc3f9a5659444d8b137455ceee81a24e38da3d3427a207f98c
+      size: 632
   original:
-    hackage: srtree-1.0.0.1
+    hackage: srtree-1.0.0.4
+- completed:
+    hackage: optparse-applicative-0.18.0.0@sha256:480aed9d0cf79db3ea4aee222bdf49719a4bdbc6a078a6f0b5f9a4eb4c603fcb,5070
+    pantry-tree:
+      sha256: 8ca7796cacf478c464e50dec8e878b929eebf4fb07e81347f087d938d0e57fde
+      size: 3124
+  original:
+    hackage: optparse-applicative-0.18.0.0
 - completed:
     hackage: hegg-0.3.0.0@sha256:913a91c7326a767626d6bc949ea38af857cc6dee22b3e49270f7342e2b2bf762,5718
     pantry-tree:

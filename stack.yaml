@@ -42,7 +42,8 @@ packages:
 #
 # extra-deps: []
 extra-deps:                                                                                                   
-  - srtree-1.0.0.1
+  - srtree-1.0.0.4
+  - optparse-applicative-0.18.0.0
 #  - git: https://github.com/folivetti/pandoc-symreg.git
 #    commit: 2a04c6e916c5f2383215d63c25fc5d0edb6ddcaf
   - hegg-0.3.0.0
