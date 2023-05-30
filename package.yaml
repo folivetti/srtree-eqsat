@@ -45,19 +45,6 @@ ghc-options:
 library:
   source-dirs: src
 
-#executables:
-#  srtree-eqsat:
-#    main:                Main.hs
-#    source-dirs:         app
-#    ghc-options:
-#    - -threaded
-#    - -rtsopts
-#    - -with-rtsopts=-N
-#    - -O2
-#    - -optc-O3
-#    dependencies:
-#    - srtree-eqsat
-
 tests:
   srtree-eqsat-test:
     main:                Spec.hs

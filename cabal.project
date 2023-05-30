@@ -1,6 +1,0 @@
-packages: .
-
-source-repository-package
-    type: git
-    location: https://github.com/folivetti/pandoc-symreg.git
-    tag: 2a04c6e916c5f2383215d63c25fc5d0edb6ddcaf
